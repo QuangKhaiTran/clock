@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OdoClocker - Đồng Hồ Việt Nam</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500;700&display=swap');
+        
+        :root {
+            --primary-color: #5D5CDE;
+            --text-light: #FFFFFF;
+            --bg-dark: #121212;
+            --digit-color: #fff;
+            --digit-bg: #333333;
+            --digit-highlight: #444444;
+            --digit-shadow: rgba(0, 0, 0, 0.5);
+            
+            /* Digit size variables */
+            --digit-width: 30px;
+            --digit-height: 42px;
+            --digit-font-size: 24px;
+            --digit-radius: 4px;
+            
+            /* Animation timing */
+            --scroll-duration: 0.3s;
+        }
+
+        body {
+            font-family: 'Roboto Mono', monospace;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100%;
+            color: var(--text-light);
+            background-color: var(--bg-dark);
+            -webkit-font-smoothing: antialiased;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .app-container {
+            position: relative;
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #background-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        #youtube-background {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            z-index: 1;
+        }
+
+        /* Main clock container */
+        .clock-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            background-color: rgba(20, 20, 20, 0.3);
+            padding: 15px;
+            border-radius: 16px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transform: translateZ(0);
+        }
+
+        .digits-container {
+            display: flex;
+            margin-bottom: 15px;
+            gap: 8px;
+        }
+
+        .digit-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .group-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            margin-top: 6px;
+            font-weight: 600;
+            opacity: 0.8;
+            letter-spacing: 0.5px;
+            color: #8A89FF;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Odometer style numbers */
+        .odometer-wrapper {
+            position: relative;
+            width: var(--digit-width);
+            height: var(--digit-height);
+            overflow: hidden;
+            border-radius: var(--digit-radius);
+            background-color: var(--digit-bg);
+            box-shadow: inset 0 2px 5px var(--digit-shadow), 0 2px 5px rgba(0, 0, 0, 0.2);
+            margin: 0 1px;
+        }
+
+        .odometer-column {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1000%; /* Tall enough for all numbers */
+            transition: transform var(--scroll-duration) cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backface-visibility: hidden;
+            transform: translateZ(0);
+            will-change: transform;
+        }
+
+        /* Number positions for the odometer */
+        .odometer-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 10%;
+            font-size: var(--digit-font-size);
+            font-weight: 700;
+            color: var(--digit-color);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Separator for hours:minutes:seconds */
+        .separator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 1px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #8A89FF;
+            text-shadow: 0 0 5px rgba(138, 137, 255, 0.5);
+        }
+
+        /* Top and bottom shadows for 3D effect */
+        .odometer-wrapper::before,
+        .odometer-wrapper::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 25%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .odometer-wrapper::before {
+            top: 0;
+            background: linear-gradient(to bottom, 
+                rgba(0, 0, 0, 0.4) 0%, 
+                rgba(0, 0, 0, 0) 100%);
+        }
+
+        .odometer-wrapper::after {
+            bottom: 0;
+            background: linear-gradient(to top, 
+                rgba(0, 0, 0, 0.4) 0%, 
+                rgba(0, 0, 0, 0) 100%);
+        }
+
+        /* Current number highlight */
+        .odometer-highlight {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--digit-highlight);
+            z-index: -1;
+            transform: translateY(calc(var(--digit-height) * 0.4));
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .date-display {
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: #8A89FF;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.5px;
+        }
+
+        .time-display {
+            display: flex;
+            flex-direction: row;
+            margin-bottom: 6px;
+        }
+
+        /* Fullscreen button */
+        .fullscreen-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background-color: rgba(93, 92, 222, 0.2);
+            color: #8A89FF;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            transition: background-color 0.3s ease;
+            z-index: 100;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(93, 92, 222, 0.15);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateZ(0);
+        }
+
+        .fullscreen-btn:active {
+            background-color: rgba(93, 92, 222, 0.35);
+        }
+        
+        /* Prevent text selection */
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        /* Fullscreen mode styles - completely transparent */
+        .fullscreen .overlay {
+            background-color: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        
+        .fullscreen .clock-container {
+            transform: scale(1.2);
+            background-color: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+        
+        .fullscreen .fullscreen-btn {
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="background-container">
+            <div class="overlay"></div>
+            <div id="youtube-background"></div>
+        </div>
+        
+        <div class="clock-container">
+            <div class="date-display" id="date-display"></div>
+            
+            <div class="time-display">
+                <!-- Hours -->
+                <div class="odometer-wrapper">
+                    <div class="odometer-column" id="hour-tens">
+                        <div class="odometer-number">0</div>
+                        <div class="odometer-number">1</div>
+                        <div class="odometer-number">2</div>
+                        <div class="odometer-number">3</div>
+                        <div class="odometer-number">4</div>
+                        <div class="odometer-number">5</div>
+                        <div class="odometer-number">6</div>
+                        <div class="odometer-number">7</div>
+                        <div class="odometer-number">8</div>
+                        <div class="odometer-number">9</div>
+                    </div>
+                    <div class="odometer-highlight"></div>
+                </div>
+                
+                <div class="odometer-wrapper">
+                    <div class="odometer-column" id="hour-ones">
+                        <div class="odometer-number">0</div>
+                        <div class="odometer-number">1</div>
+                        <div class="odometer-number">2</div>
+                        <div class="odometer-number">3</div>
+                        <div class="odometer-number">4</div>
+                        <div class="odometer-number">5</div>
+                        <div class="odometer-number">6</div>
+                        <div class="odometer-number">7</div>
+                        <div class="odometer-number">8</div>
+                        <div class="odometer-number">9</div>
+                    </div>
+                    <div class="odometer-highlight"></div>
+                </div>
+                
+                <div class="separator">:</div>
+                
+                <!-- Minutes -->
+                <div class="odometer-wrapper">
+                    <div class="odometer-column" id="minute-tens">
+                        <div class="odometer-number">0</div>
+                        <div class="odometer-number">1</div>
+                        <div class="odometer-number">2</div>
+                        <div class="odometer-number">3</div>
+                        <div class="odometer-number">4</div>
+                        <div class="odometer-number">5</div>
+                        <div class="odometer-number">6</div>
+                        <div class="odometer-number">7</div>
+                        <div class="odometer-number">8</div>
+                        <div class="odometer-number">9</div>
+                    </div>
+                    <div class="odometer-highlight"></div>
+                </div>
+                
+                <div class="odometer-wrapper">
+                    <div class="odometer-column" id="minute-ones">
+                        <div class="odometer-number">0</div>
+                        <div class="odometer-number">1</div>
+                        <div class="odometer-number">2</div>
+                        <div class="odometer-number">3</div>
+                        <div class="odometer-number">4</div>
+                        <div class="odometer-number">5</div>
+                        <div class="odometer-number">6</div>
+                        <div class="odometer-number">7</div>
+                        <div class="odometer-number">8</div>
+                        <div class="odometer-number">9</div>
+                    </div>
+                    <div class="odometer-highlight"></div>
+                </div>
+                
+                <div class="separator">:</div>
+                
+                <!-- Seconds -->
+                <div class="odometer-wrapper">
+                    <div class="odometer-column" id="second-tens">
+                        <div class="odometer-number">0</div>
+                        <div class="odometer-number">1</div>
+                        <div class="odometer-number">2</div>
+                        <div class="odometer-number">3</div>
+                        <div class="odometer-number">4</div>
+                        <div class="odometer-number">5</div>
+                        <div class="odometer-number">6</div>
+                        <div class="odometer-number">7</div>
+                        <div class="odometer-number">8</div>
+                        <div class="odometer-number">9</div>
+                    </div>
+                    <div class="odometer-highlight"></div>
+                </div>
+                
+                <div class="odometer-wrapper">
+                    <div class="odometer-column" id="second-ones">
+                        <div class="odometer-number">0</div>
+                        <div class="odometer-number">1</div>
+                        <div class="odometer-number">2</div>
+                        <div class="odometer-number">3</div>
+                        <div class="odometer-number">4</div>
+                        <div class="odometer-number">5</div>
+                        <div class="odometer-number">6</div>
+                        <div class="odometer-number">7</div>
+                        <div class="odometer-number">8</div>
+                        <div class="odometer-number">9</div>
+                    </div>
+                    <div class="odometer-highlight"></div>
+                </div>
+            </div>
+            
+            <div class="digits-container">
+                <div class="digit-group">
+                    <div class="group-label">Giờ</div>
+                </div>
+                <div class="digit-group">
+                    <div class="group-label">Phút</div>
+                </div>
+                <div class="digit-group">
+                    <div class="group-label">Giây</div>
+                </div>
+            </div>
+        </div>
+        
+        <button id="fullscreen-btn" class="fullscreen-btn"><i class="fas fa-expand"></i></button>
+    </div>
+
+    <script>
+        // Tối ưu global variables
+        let player;
+        let playerReady = false;
+        let videoId = 'lrf-GAYUOkQ';
+        
+        // Biến theo dõi chữ số trước đó
+        const previousDigits = {
+            hourTens: -1,
+            hourOnes: -1,
+            minuteTens: -1,
+            minuteOnes: -1,
+            secondTens: -1,
+            secondOnes: -1
+        };
+        
+        // Biến kiểm soát animation
+        const animationInProgress = {
+            hourTens: false,
+            hourOnes: false,
+            minuteTens: false, 
+            minuteOnes: false,
+            secondTens: false,
+            secondOnes: false
+        };
+
+        // Tải YouTube API
+        function loadYouTubeAPI() {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+
+        // Khởi tạo player YouTube khi API sẵn sàng
+        window.onYouTubeIframeAPIReady = function() {
+            createYouTubePlayer(videoId);
+        };
+
+        // Tạo YouTube player - đơn giản hóa
+        function createYouTubePlayer(videoId) {
+            try {
+                if (player) player.destroy();
+                
+                player = new YT.Player('youtube-background', {
+                    videoId: videoId,
+                    playerVars: {
+                        autoplay: 1,
+                        loop: 1,
+                        playlist: videoId,
+                        controls: 0,
+                        showinfo: 0,
+                        rel: 0,
+                        mute: 1,
+                        playsinline: 1,
+                        modestbranding: 1
+                    },
+                    events: {
+                        'onReady': function(event) {
+                            playerReady = true;
+                            event.target.playVideo();
+                        },
+                        'onError': function() {
+                            document.getElementById('background-container').style.backgroundColor = '#000';
+                        }
+                    }
+                });
+            } catch (error) {
+                document.getElementById('background-container').style.backgroundColor = '#000';
+            }
+        }
+
+        // Khởi tạo các chức năng khi tài liệu đã tải xong
+        document.addEventListener('DOMContentLoaded', function() {
+            // Khởi tạo odometer columns
+            initOdometers();
+            
+            // Bắt đầu đồng hồ
+            updateClock();
+            updateDate();
+            
+            // Tối ưu interval để tiết kiệm pin
+            setInterval(updateClock, 1000);
+            
+            // Tải YouTube API
+            loadYouTubeAPI();
+            
+            // Xử lý nút toàn màn hình
+            document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+            
+            // Sự kiện khi thoát fullscreen bằng Esc
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+        });
+        
+        // Khởi tạo odometer columns
+        function initOdometers() {
+            const columns = document.querySelectorAll('.odometer-column');
+            
+            // Đặt vị trí ban đầu (hiển thị số 0)
+            columns.forEach(column => {
+                column.style.transform = 'translateY(0%)';
+            });
+        }
+
+        // Xử lý toàn màn hình
+        function toggleFullscreen() {
+            const appContainer = document.querySelector('.app-container');
+            const fullscreenBtn = document.getElementById('fullscreen-btn');
+            
+            // Xử lý đặc biệt cho iOS
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            if (isIOS) {
+                // Toggle class cho iOS
+                appContainer.classList.toggle('fullscreen');
+                fullscreenBtn.innerHTML = appContainer.classList.contains('fullscreen') ? 
+                    '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
+                return;
+            }
+            
+            if (!document.fullscreenElement) {
+                if (appContainer.requestFullscreen) {
+                    appContainer.requestFullscreen();
+                } else if (appContainer.webkitRequestFullscreen) {
+                    appContainer.webkitRequestFullscreen();
+                } else if (appContainer.msRequestFullscreen) {
+                    appContainer.msRequestFullscreen();
+                }
+                appContainer.classList.add('fullscreen');
+                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+                appContainer.classList.remove('fullscreen');
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        }
+        
+        // Xử lý sự kiện thoát fullscreen
+        function handleFullscreenChange() {
+            if (!document.fullscreenElement) {
+                const appContainer = document.querySelector('.app-container');
+                const fullscreenBtn = document.getElementById('fullscreen-btn');
+                appContainer.classList.remove('fullscreen');
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        }
+
+        // Cập nhật đồng hồ
+        function updateClock() {
+            // Múi giờ Việt Nam (UTC+7)
+            const now = new Date();
+            const vietnamTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (7 * 3600000));
+            
+            const hours = vietnamTime.getHours();
+            const minutes = vietnamTime.getMinutes();
+            const seconds = vietnamTime.getSeconds();
+            
+            // Phân tách các chữ số
+            const hourTens = Math.floor(hours / 10);
+            const hourOnes = hours % 10;
+            const minuteTens = Math.floor(minutes / 10);
+            const minuteOnes = minutes % 10;
+            const secondTens = Math.floor(seconds / 10);
+            const secondOnes = seconds % 10;
+            
+            // Mảng các cập nhật
+            const digits = [
+                { id: 'hour-tens', value: hourTens, prev: previousDigits.hourTens },
+                { id: 'hour-ones', value: hourOnes, prev: previousDigits.hourOnes },
+                { id: 'minute-tens', value: minuteTens, prev: previousDigits.minuteTens },
+                { id: 'minute-ones', value: minuteOnes, prev: previousDigits.minuteOnes },
+                { id: 'second-tens', value: secondTens, prev: previousDigits.secondTens },
+                { id: 'second-ones', value: secondOnes, prev: previousDigits.secondOnes }
+            ];
+            
+            // Lọc những phần tử cần cập nhật và kiểm tra không đang trong animation
+            digits.forEach(digit => {
+                const shortId = digit.id.replace('-', '');
+                if (digit.value !== digit.prev && !animationInProgress[shortId]) {
+                    updateOdometer(digit.id, digit.value);
+                    previousDigits[shortId] = digit.value;
+                }
+            });
+        }
+
+        // Cập nhật từng chữ số - kiểu odometer
+        function updateOdometer(id, newValue) {
+            const shortId = id.replace('-', '');
+            const column = document.getElementById(id);
+            
+            if (!column) return;
+            
+            // Đánh dấu đang trong quá trình animation
+            animationInProgress[shortId] = true;
+            
+            // Tính toán vị trí mới (mỗi số chiếm 10%)
+            const newPosition = -newValue * 10;
+            
+            // Áp dụng transform để cuộn đến số mới
+            column.style.transform = `translateY(${newPosition}%)`;
+            
+            // Reset trạng thái animation sau khi hoàn tất
+            setTimeout(() => {
+                animationInProgress[shortId] = false;
+            }, 350); // Thời gian dài hơn chút so với animation để đảm bảo đã hoàn tất
+        }
+
+        // Cập nhật hiển thị ngày
+        function updateDate() {
+            const now = new Date();
+            const vietnamTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (7 * 3600000));
+            
+            try {
+                // Fallback đơn giản hơn
+                const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+                const months = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 
+                             'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+                
+                const day = days[vietnamTime.getDay()];
+                const date = vietnamTime.getDate();
+                const month = months[vietnamTime.getMonth()];
+                const year = vietnamTime.getFullYear();
+                
+                document.getElementById('date-display').textContent = 
+                    `${day}, ${date} ${month} ${year}`;
+            } catch (error) {
+                const dateStr = vietnamTime.toLocaleDateString();
+                document.getElementById('date-display').textContent = dateStr;
+            }
+        }
+    </script> 
+</body>
+</html>
